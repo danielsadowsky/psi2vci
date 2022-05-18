@@ -7,6 +7,8 @@ import read
 import write
 import datetime
 
+np.set_printoptions(precision=5,suppress=1e-5)
+
 #DEFINE FUNCTIONS:
 def eval_eq(function,variables,values,n=3):
     V = function
@@ -72,7 +74,8 @@ if True:
     natoms, bonds, angs, nops, oops, nors, tors = read.defconn(A)
     nbonds = len(bonds)
     nangs = len(angs)
-    X_i, H_i = read.define_internals(X,H,A,bonds,angs)
+    noops = len(oops)
+    X_i, H_i = read.define_internals(X,H,A,bonds,angs,oops)
     BDE = TAE / nbonds  
 if verbose > 2:
     print("SETTING UP INTERNAL COORDINATES:")
@@ -84,6 +87,10 @@ if verbose > 2:
     print("bond angles [rad]:")
     for i in range(nangs):
         print( Z[angs[i][0]], Z[angs[i][1]], Z[angs[i][2]], X_i[nbonds+i] )
+    print()
+    print("out-of-plane angles [rad]:")
+    for i in range(noops):
+        print( Z[oops[i][0]], Z[oops[i][1]], Z[oops[i][2]], Z[oops[i][3]], X_i[nbonds+nangs+i] )
     print()
     print("Hessian [a.u.]:")
     print(H_i)
@@ -102,9 +109,41 @@ if True:
             X_S.append( sym.Symbol( 'r' + str(i) ) ) 
         for i in range(nangs):
             X_S.append( sym.Symbol( 't' + str(i) ) ) 
-        p = 0
-        q = 1
-        r = 2 
+        for i in range(noops):
+            X_S.append( sym.Symbol( 'p' + str(i) ) ) 
+    for i in range(noops):
+        p = oops[i][4]
+        q = oops[i][5]
+        r = oops[i][6]
+        for j in range(nangs):
+            a = angs[j][3]
+            b = angs[j][4]
+            if min(a,b) == q and max(a,b) == r:  
+                t_p = nbonds + j 
+            elif min(a,b) == p and max(a,b) == r:  
+                t_q = nbonds + j 
+            elif min(a,b) == p and max(a,b) == q:  
+                t_r = nbonds + j 
+        s = nbonds + nangs + i
+        if args.C:
+            # HARMONIC TETRATOMIC
+            G += 0.5 * H_i[s,s] * ( X_S[s] - X_i[s] )**2 
+            G += H_i[p,t_p] * ( X_S[p] - X_i[p] ) * ( X_S[t_p] - X_i[t_p] )
+            G += H_i[q,t_q] * ( X_S[q] - X_i[q] ) * ( X_S[t_q] - X_i[t_q] )
+            G += H_i[r,t_r] * ( X_S[r] - X_i[r] ) * ( X_S[t_r] - X_i[t_r] )
+            G += H_i[t_p,t_q] * ( X_S[t_p] - X_i[t_p] ) * ( X_S[t_q] - X_i[t_q] )
+            G += H_i[t_p,t_r] * ( X_S[t_p] - X_i[t_p] ) * ( X_S[t_r] - X_i[t_r] )
+            G += H_i[t_q,t_r] * ( X_S[t_q] - X_i[t_q] ) * ( X_S[t_r] - X_i[t_r] )
+            G += H_i[p,s] * ( X_S[p] - X_i[p] ) * ( X_S[s] - X_i[s] )
+            G += H_i[q,s] * ( X_S[q] - X_i[q] ) * ( X_S[s] - X_i[s] )
+            G += H_i[r,s] * ( X_S[r] - X_i[r] ) * ( X_S[s] - X_i[s] )
+            G += H_i[t_p,s] * ( X_S[t_p] - X_i[t_p] ) * ( X_S[s] - X_i[s] )
+            G += H_i[t_q,s] * ( X_S[t_q] - X_i[t_q] ) * ( X_S[s] - X_i[s] )
+            G += H_i[t_r,s] * ( X_S[t_r] - X_i[t_r] ) * ( X_S[s] - X_i[s] )
+    for i in range(nangs): 
+        p = angs[i][3]
+        q = angs[i][4] 
+        r = nbonds + i
         R_V = ( X_S[p] * X_S[p] + X_S[q] * X_S[q] - 2 * X_S[p] * X_S[q] * sym.cos(X_S[r]) )**(0.5)
         R_E = sym.sqrt( X_i[p] * X_i[p] + X_i[q] * X_i[q] - 2 * X_i[p] * X_i[q] * sym.cos(X_i[r]) )
         if args.P:
@@ -219,33 +258,28 @@ if True:
                        print(sol)
                        print()
                     G += anderson(sol,"U") 
-        if True:
-              if args.O:
-                k_0 = H_i[p,p] + K
+    for p in range(nbonds):
+            if args.O:
+                k_0 = H_i[p,p] 
                 G += 0.5 * k_0 * ( X_S[p] - x_0 )**2 
-                G += 0.5 * k_0 * ( X_S[q] - x_0 )**2  
-              elif args.M:
+            elif args.M:
                 # MORSE
-                if True:
-                    U_b = 0.0
-                    x_0 = X_i[p]
-                    alpha = math.sqrt( 0.5 * H_i[p,p] / D ) 
-                G += D * ( 1 - sym.exp( -alpha * ( X_S[p] - x_0 ) ) )**2 - U_b
-                G += D * ( 1 - sym.exp( -alpha * ( X_S[q] - x_0 ) ) )**2 - U_b
-              elif args.V:
-                if True:
-                    U_b = 0.0
-                    x_0 = X_i[p]
-                    beta = 0.5 * math.sqrt( 0.5 * H_i[p,p] / D ) / x_0 - 0.5 / x_0 / x_0
-                G += D * ( 1 - x_0 / X_S[p] * sym.exp( -beta * ( X_S[p] * X_S[p] - x_0 * x_0 ) ) )**2 - U_b
-                G += D * ( 1 - x_0 / X_S[q] * sym.exp( -beta * ( X_S[q] * X_S[q] - x_0 * x_0 ) ) )**2 - U_b
-        if verbose > 2:
-                k_xxx = eval_eq( sym.diff( G, X_S[p], 3), X_S, X_i )   
-                k_xxy = eval_eq( sym.diff( sym.diff( G, X_S[p], 2), X_S[q] ), X_S, X_i )   
-                k_xxt = eval_eq( sym.diff( sym.diff( G, X_S[p], 2), X_S[r] ), X_S, X_i )   
-                k_xyt = eval_eq( sym.diff( sym.diff( sym.diff( G, X_S[p] ), X_S[q] ), X_S[r] ), X_S, X_i )   
-                k_xtt = eval_eq( sym.diff( sym.diff( G, X_S[r], 2), X_S[p] ), X_S, X_i )    
-                k_ttt = eval_eq( sym.diff( G, X_S[r], 3), X_S, X_i )   
+                x_0 = X_i[p]
+                k_0 = H_i[p,p]
+                alpha = math.sqrt( 0.5 * k_0 / D ) 
+                G += D * ( 1 - sym.exp( -alpha * ( X_S[p] - x_0 ) ) )**2 
+            elif args.V:
+                x_0 = X_i[p]
+                k_0 = H_i[p,p]
+                beta = 0.5 * math.sqrt( 0.5 * k_0 / D ) / x_0 - 0.5 / x_0 / x_0
+                G += D * ( 1 - x_0 / X_S[p] * sym.exp( -beta * ( X_S[p] * X_S[p] - x_0 * x_0 ) ) )**2 
+    if verbose > 2 and natoms == 3:
+                k_xxx = eval_eq( sym.diff( G, X_S[0], 3), X_S, X_i )   
+                k_xxy = eval_eq( sym.diff( sym.diff( G, X_S[0], 2), X_S[1] ), X_S, X_i )   
+                k_xxt = eval_eq( sym.diff( sym.diff( G, X_S[0], 2), X_S[2] ), X_S, X_i )   
+                k_xyt = eval_eq( sym.diff( sym.diff( sym.diff( G, X_S[0] ), X_S[1] ), X_S[2] ), X_S, X_i )   
+                k_xtt = eval_eq( sym.diff( sym.diff( G, X_S[2], 2), X_S[0] ), X_S, X_i )    
+                k_ttt = eval_eq( sym.diff( G, X_S[2], 3), X_S, X_i )   
                 print("FORCE FIELD THIRD DERIVATIVES:")
                 print("k_xxx", k_xxx )
                 print("k_xxy", k_xxy )
@@ -254,7 +288,7 @@ if True:
                 print("k_xtt", k_xtt )
                 print("k_ttt", k_ttt )
                 print()
-        F = write.calc_tensor(G,X_S,X_i,H_i)
-        write.pypes( args.o, F, Z, X, X_i, notes )
-        print("FORCE FIELD OUTPUT TO " + args.o )
+    F = write.calc_tensor(G,X_S,X_i,H_i)
+    write.pypes( args.o, F, Z, X, X_i, A, notes )
+    print("FORCE FIELD OUTPUT TO " + args.o )
 

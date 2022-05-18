@@ -274,12 +274,13 @@ def moveatom(B,n,a,v):
         B[n,3*a+k] = v[k]
     return B
 
-def define_internals(X,H,A,bonds,angs):
+def define_internals(X,H,A,bonds,angs,oops):
     X_i = []
     nbonds = len(bonds)
     nangs = len(angs)
+    noops = len(oops)
     natoms = len(X)
-    B = np.zeros((nbonds+nangs,3*natoms))
+    B = np.zeros((nbonds+nangs+noops,3*natoms))
     for p in range(len(bonds)):
         a = bonds[p][0]
         b = bonds[p][1]
@@ -325,6 +326,28 @@ def define_internals(X,H,A,bonds,angs):
             for i in frag_c:
                 B = moveatom( B, nr, i, scale * cb * PC / 2 )
         X_i.append( theta )
+    for s in range(noops):
+        ns = nbonds + nangs + s
+        a, b, c, d, p, q, r = oops[s]
+        AB, ab = bondvec(X,b,a)
+        AC, ac = bondvec(X,c,a)
+        AD, ad = bondvec(X,d,a)
+        BC, bc = bondvec(X,c,b)
+        BD, bd = bondvec(X,d,b)
+        if sum(A[b]) == 1 and sum(A[c]) == 1 and sum(A[d]) == 1:
+            B = moveatom( B, ns, b, ab * normal(BC,BD)  / 3 )
+            B = moveatom( B, ns, c, ac * normal(BC,BD)  / 3 )
+            B = moveatom( B, ns, d, ad * normal(BC,BD)  / 3 )
+        elif False:
+            B = moveatom( B, ns, b, ( normal(AC,AD) + AB ) / 3 )
+            B = moveatom( B, ns, c, ( normal(AD,AB) + AC ) / 3 )
+            B = moveatom( B, ns, d, ( normal(AB,AC) + AD ) / 3 )
+            B = moveatom( B, ns, b, ab * normal(normal(normal(AC,AD),AB),AB) / 3 )
+            B = moveatom( B, ns, c, ac * normal(normal(normal(AD,AB),AC),AC) / 3 )
+            B = moveatom( B, ns, d, ad * normal(normal(normal(AB,AC),AD),AD) / 3 )
+        theta = angle(AB,AC)
+        norm = normal(AB,AC)
+        X_i.append( np.dot(norm,AD) / theta )
     H_i = np.dot(np.dot(B,H),np.transpose(B))
     return X_i, H_i
 

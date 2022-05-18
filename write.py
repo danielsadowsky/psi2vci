@@ -9,8 +9,6 @@ import read
 import sympy as sym
 from sympy.solvers.solveset import nonlinsolve
 
-# ONLY WORKS FOR XY2
-
 # SET UNITS:
 units = [ 1, 1 ]
 atto = 4.359744650 # aJ * hartree-1
@@ -106,17 +104,13 @@ def calc_tensor(G,X_S,X_i,H_i,order=6):
         print()
     return F 
 
-
-
-def pypes(filename,F,Z,X,X_i,notes,order=6):
-    # TRIATOMIC SPECIFIC STUFF
-    nbonds = 2
-    nangs = 1
-    noops = 0
-    ntors = 0
-    nints = 3
-    bonds = [ (0,1), (0,2) ] 
-    angs = [ (1,0,2,0,1) ]
+def pypes(filename,F,Z,X,X_i,A,notes,order=6):
+    natoms, bonds, angs, nops, oops, nors, tors = read.defconn(A)
+    nbonds = len(bonds)
+    nangs = len(angs)
+    noops = len(oops)
+    ntors = len(tors)
+    nints = nbonds + nangs + noops + ntors  
     file = open( filename, 'w' )
     prologue = """from __future__ import absolute_import
 from __future__ import print_function
