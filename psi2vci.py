@@ -71,10 +71,11 @@ if True:
     Z, X = read.xyz(args.x) 
     H = read.hess(args.y) 
     A = read.adj(args.x)
-    natoms, bonds, angs, nops, oops, nors, tors = read.defconn(A)
+    natoms, bonds, angs, oops, nors, tors = read.defconn(A)
     nbonds = len(bonds)
-    nangs = len(angs)
+    nangs = len(angs) 
     noops = len(oops)
+    nnors = len(nors)
     X_i, H_i = read.define_internals(X,H,A,bonds,angs,oops)
     BDE = TAE / nbonds  
 if verbose > 2:
@@ -140,6 +141,23 @@ if True:
             G += H_i[t_p,s] * ( X_S[t_p] - X_i[t_p] ) * ( X_S[s] - X_i[s] )
             G += H_i[t_q,s] * ( X_S[t_q] - X_i[t_q] ) * ( X_S[s] - X_i[s] )
             G += H_i[t_r,s] * ( X_S[t_r] - X_i[t_r] ) * ( X_S[s] - X_i[s] )
+    for i in range(nnors):
+        tetangs = [ nbonds + nors[i][j] for j in range(6) ] 
+        if args.C:
+            # HARMONIC PENTATOMIC
+            for j in range(6):
+                for k in range(j+1,6): 
+                    G += H_i[ tetangs[j], tetangs[k] ] * ( X_S[ tetangs[j] ] - X_i[ tetangs[j] ] ) * ( X_S[ tetangs[k] ] - X_i[ tetangs[k] ] )
+                    p_a = angs[ j ][3] 
+                    q_a = angs[ j ][4] 
+                    p_b = angs[ k ][3] 
+                    q_b = angs[ k ][4] 
+                    opposite_bonds = [ p_b, q_b ]
+                    if not ( p_a in opposite_bonds ) and not ( q_a in opposite_bonds): 
+                        G += H_i[ q_b, tetangs[j] ] * ( X_S[ tetangs[j] ] - X_i[ tetangs[j] ] ) * ( X_S[q_b] - X_i[q_b] )
+                        G += H_i[ q_a, tetangs[k] ] * ( X_S[ tetangs[k] ] - X_i[ tetangs[k] ] ) * ( X_S[q_a] - X_i[q_a] )
+                        G += H_i[ p_b, tetangs[j] ] * ( X_S[ tetangs[j] ] - X_i[ tetangs[j] ] ) * ( X_S[p_b] - X_i[p_b] )
+                        G += H_i[ p_a, tetangs[k] ] * ( X_S[ tetangs[k] ] - X_i[ tetangs[k] ] ) * ( X_S[p_a] - X_i[p_a] )
     for i in range(nangs): 
         p = angs[i][3]
         q = angs[i][4] 
@@ -261,6 +279,7 @@ if True:
     for p in range(nbonds):
             if args.O:
                 k_0 = H_i[p,p] 
+                x_0 = X_i[p]
                 G += 0.5 * k_0 * ( X_S[p] - x_0 )**2 
             elif args.M:
                 # MORSE

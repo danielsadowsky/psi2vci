@@ -94,7 +94,6 @@ def defconn(A):
     conn = []
     angs = []
     oops = []
-    nops = []
     nors = []
     tors = []
     for i in range(natoms):
@@ -138,13 +137,6 @@ def defconn(A):
                     p = conn.index([min(a,i),max(a,i)])
                     q = conn.index([min(b,i),max(b,i)])
                     angs.append( ( a, i, b, p, q ) )
-                    for l in range(k+1,4):
-                        terms = bondto[i][:]
-                        c = terms.pop(l)
-                        b = terms.pop(k) 
-                        a = terms.pop(j)
-                        r = conn.index([min(c,i),max(c,i)])
-                        nops.append( ( p, q, r ) )
         if sum(A[i]) == 5:
             for j in range(5):
                 for k in range(j+1,5):
@@ -190,13 +182,7 @@ def defconn(A):
                     #p = conn.index([min(i,k),max(i,k)])
                     #r = conn.index([min(j,l),max(j,l)])
                     tors.append( ( k, i, j, l ) )
-    for x in range(len(nops)):
-        ain = []
-        for y in range(len(angs)):
-            if angs[y][3] in nops[x] and angs[y][4] in nops[x]:
-                ain.append(y)
-        nops[x] = ( tuple(nops[x]) + tuple(ain) )
-    return natoms, conn, angs, nops, oops, nors, tors
+    return natoms, conn, angs, oops, nors, tors
 
 def distance_matrix(A):
     D = A.copy()
@@ -305,26 +291,20 @@ def define_internals(X,H,A,bonds,angs,oops):
         norm = normal(AB,CB)
         PA = np.cross( AB, norm )
         PC = -np.cross( CB, norm )
-        if sum(A[b]) == 4:
-            scale = 5.0 / 6
-        elif sum(A[b]) == 3:
-            scale =  2.0 / 3
-        else:
-            scale = 1.0
         if sum(A[a]) == 1 and sum(A[c]) == 1:
-            B = moveatom( B, nr, a, scale * ab * PA / 2 )
-            B = moveatom( B, nr, c, scale * cb * PC / 2 )
+            B = moveatom( B, nr, a, ab * PA / 2 )
+            B = moveatom( B, nr, c, cb * PC / 2 )
         elif sum(A[a]) == 1 and sum(A[c]) > 1:
-            B = moveatom( B, nr, a, scale * ab * PA )
+            B = moveatom( B, nr, a, ab * PA )
         elif sum(A[c]) == 1 and sum(A[a]) > 1:
-            B = moveatom( B, nr, c, scale * cb * PC )
+            B = moveatom( B, nr, c, cb * PC )
         else:
             frag_a, rest = read.divide(A,a,b)
             rest, frag_c = read.divide(A,b,c)
             for i in frag_a:
-                B = moveatom( B, nr, i, scale * ab * PA / 2 )
+                B = moveatom( B, nr, i, ab * PA / 2 )
             for i in frag_c:
-                B = moveatom( B, nr, i, scale * cb * PC / 2 )
+                B = moveatom( B, nr, i, cb * PC / 2 )
         X_i.append( theta )
     for s in range(noops):
         ns = nbonds + nangs + s
@@ -338,13 +318,6 @@ def define_internals(X,H,A,bonds,angs,oops):
             B = moveatom( B, ns, b, ab * normal(BC,BD)  / 3 )
             B = moveatom( B, ns, c, ac * normal(BC,BD)  / 3 )
             B = moveatom( B, ns, d, ad * normal(BC,BD)  / 3 )
-        elif False:
-            B = moveatom( B, ns, b, ( normal(AC,AD) + AB ) / 3 )
-            B = moveatom( B, ns, c, ( normal(AD,AB) + AC ) / 3 )
-            B = moveatom( B, ns, d, ( normal(AB,AC) + AD ) / 3 )
-            B = moveatom( B, ns, b, ab * normal(normal(normal(AC,AD),AB),AB) / 3 )
-            B = moveatom( B, ns, c, ac * normal(normal(normal(AD,AB),AC),AC) / 3 )
-            B = moveatom( B, ns, d, ad * normal(normal(normal(AB,AC),AD),AD) / 3 )
         theta = angle(AB,AC)
         norm = normal(AB,AC)
         X_i.append( np.dot(norm,AD) / theta )
