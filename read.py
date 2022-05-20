@@ -266,8 +266,9 @@ def define_internals(X,H,A,bonds,angs,oops):
     nangs = len(angs)
     noops = len(oops)
     natoms = len(X)
-    B = np.zeros((nbonds+nangs+noops,3*natoms))
-    for p in range(len(bonds)):
+    nints = nbonds + nangs + noops
+    B = np.zeros((nints,3*natoms))
+    for p in range(nbonds):
         a = bonds[p][0]
         b = bonds[p][1]
         AB, ab = bondvec(X,a,b)
@@ -278,9 +279,9 @@ def define_internals(X,H,A,bonds,angs,oops):
         else:
             L, R = read.divide(A,a,b)
             for j in L:
-                B = moveatom( B, p, j, AB )
+                B = moveatom( B, p, j, AB / 2 )
             for j in R:
-                B = moveatom( B, p, j, -AB )
+                B = moveatom( B, p, j, -AB / 2 )
         X_i.append( ab )
     for r in range(nangs):
         nr = nbonds + r
@@ -291,20 +292,26 @@ def define_internals(X,H,A,bonds,angs,oops):
         norm = normal(AB,CB)
         PA = np.cross( AB, norm )
         PC = -np.cross( CB, norm )
+        if sum(A[b]) == 3:
+            scale = 2 / 3
+        else:
+            scale = 1
         if sum(A[a]) == 1 and sum(A[c]) == 1:
-            B = moveatom( B, nr, a, ab * PA / 2 )
-            B = moveatom( B, nr, c, cb * PC / 2 )
+            B = moveatom( B, nr, a, scale * ab * PA / 2 )
+            B = moveatom( B, nr, c, scale * cb * PC / 2 )
         elif sum(A[a]) == 1 and sum(A[c]) > 1:
-            B = moveatom( B, nr, a, ab * PA )
+            B = moveatom( B, nr, a, scale * ab * PA )
         elif sum(A[c]) == 1 and sum(A[a]) > 1:
-            B = moveatom( B, nr, c, cb * PC )
+            B = moveatom( B, nr, c, scale * cb * PC )
         else:
             frag_a, rest = read.divide(A,a,b)
             rest, frag_c = read.divide(A,b,c)
             for i in frag_a:
-                B = moveatom( B, nr, i, ab * PA / 2 )
+                BI, bi = bondvec(X,b,i)
+                B = moveatom( B, nr, i, scale * bi * PA / 2 )
             for i in frag_c:
-                B = moveatom( B, nr, i, cb * PC / 2 )
+                BI, bi = bondvec(X,b,i)
+                B = moveatom( B, nr, i, scale * bi * PC / 2 )
         X_i.append( theta )
     for s in range(noops):
         ns = nbonds + nangs + s
@@ -314,10 +321,14 @@ def define_internals(X,H,A,bonds,angs,oops):
         AD, ad = bondvec(X,d,a)
         BC, bc = bondvec(X,c,b)
         BD, bd = bondvec(X,d,b)
+        planarnorm = normal(BC,BD) 
         if sum(A[b]) == 1 and sum(A[c]) == 1 and sum(A[d]) == 1:
-            B = moveatom( B, ns, b, ab * normal(BC,BD)  / 3 )
-            B = moveatom( B, ns, c, ac * normal(BC,BD)  / 3 )
-            B = moveatom( B, ns, d, ad * normal(BC,BD)  / 3 )
+            norm_ab = normal(AB,normal(AB,planarnorm))  
+            norm_ac = normal(AC,normal(AC,planarnorm))  
+            norm_ad = normal(AD,normal(AD,planarnorm))  
+            B = moveatom( B, ns, b, ab * norm_ab  )
+            B = moveatom( B, ns, c, ac * norm_ac  )
+            B = moveatom( B, ns, d, ad * norm_ad  )
         theta = angle(AB,AC)
         norm = normal(AB,AC)
         X_i.append( np.dot(norm,AD) / theta )
