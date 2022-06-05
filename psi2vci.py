@@ -5,12 +5,14 @@ from scipy import optimize
 import sympy as sym
 import read
 import write
+import models
 import datetime
 
 np.set_printoptions(precision=5,suppress=1e-5)
 
 #DEFINE FUNCTIONS:
-def eval_eq(function,variables,values,n=3):
+def eval_eq(function,variables,values):
+    n = len(variables)
     V = function
     for i in range(n):
         V = V.subs(variables[i],values[i])
@@ -18,13 +20,12 @@ def eval_eq(function,variables,values,n=3):
 
 # READ PARAMETERS FROM COMMAND LINE:
 parser = argparse.ArgumentParser()
-parser.add_argument('-P', action='store_true', help='planar model (for bent triatomics)')
-parser.add_argument('-T', action='store_true', help='out-of-plane model (for bent triatomics)')
+parser.add_argument('-T', action='store_true', help='out-of-plane model for dummy atoms')
 parser.add_argument('-O', action='store_true', help='harmonic bonding potential')
 parser.add_argument('-M', action='store_true', help='Morse bonding potential')
 parser.add_argument('-V', action='store_true', help='Varshni bonding potential')
-parser.add_argument('-C', action='store_true', help='harmonic triatomic potential')
-parser.add_argument('-n', type=int, default = 0, help='modified n-Anderson potential')
+parser.add_argument('-C', action='store_true', help='harmonic coordination potentials')
+parser.add_argument('-n', type=int, default = 0, help='modified n-Anderson potentials')
 parser.add_argument('-x', type=str, help='geometry file')
 parser.add_argument('-y', type=str, help='Hessian file')
 parser.add_argument('-t', type=float, help='total atomization energy (a.u.)')
@@ -59,7 +60,7 @@ elif args.n > 0:
     notes.append("MODIFIED ANDERSON-"+str(args.n)+" TRIATOMIC POTENTIAL")
 if args.T:
     notes.append("TETRAHEDRAL LONE PAIR DEFINITION")
-elif args.P:
+else:
     notes.append("PLANAR LONE PAIR DEFINITION")
 if verbose > 1:
     for note in notes:
@@ -76,6 +77,7 @@ if True:
     nangs = len(angs) 
     noops = len(oops)
     nnors = len(nors)
+    nints = nbonds + nangs + noops
     X_i, H_i = read.define_internals(X,H,A,bonds,angs,oops)
     BDE = TAE / nbonds  
 if verbose > 2:
@@ -116,6 +118,7 @@ if True:
         p = oops[i][4]
         q = oops[i][5]
         r = oops[i][6]
+        s = nbonds + nangs + i
         for j in range(nangs):
             a = angs[j][3]
             b = angs[j][4]
@@ -125,157 +128,44 @@ if True:
                 t_q = nbonds + j 
             elif min(a,b) == p and max(a,b) == q:  
                 t_r = nbonds + j 
-        s = nbonds + nangs + i
+        indices = p, q, r, t_p, t_q, t_r, s
         if args.C:
-            # HARMONIC TETRATOMIC
-            G += 0.5 * H_i[s,s] * ( X_S[s] - X_i[s] )**2 
-            G += H_i[p,t_p] * ( X_S[p] - X_i[p] ) * ( X_S[t_p] - X_i[t_p] )
-            G += H_i[q,t_q] * ( X_S[q] - X_i[q] ) * ( X_S[t_q] - X_i[t_q] )
-            G += H_i[r,t_r] * ( X_S[r] - X_i[r] ) * ( X_S[t_r] - X_i[t_r] )
-            G += H_i[t_p,t_q] * ( X_S[t_p] - X_i[t_p] ) * ( X_S[t_q] - X_i[t_q] )
-            G += H_i[t_p,t_r] * ( X_S[t_p] - X_i[t_p] ) * ( X_S[t_r] - X_i[t_r] )
-            G += H_i[t_q,t_r] * ( X_S[t_q] - X_i[t_q] ) * ( X_S[t_r] - X_i[t_r] )
-            G += H_i[p,s] * ( X_S[p] - X_i[p] ) * ( X_S[s] - X_i[s] )
-            G += H_i[q,s] * ( X_S[q] - X_i[q] ) * ( X_S[s] - X_i[s] )
-            G += H_i[r,s] * ( X_S[r] - X_i[r] ) * ( X_S[s] - X_i[s] )
-            G += H_i[t_p,s] * ( X_S[t_p] - X_i[t_p] ) * ( X_S[s] - X_i[s] )
-            G += H_i[t_q,s] * ( X_S[t_q] - X_i[t_q] ) * ( X_S[s] - X_i[s] )
-            G += H_i[t_r,s] * ( X_S[t_r] - X_i[t_r] ) * ( X_S[s] - X_i[s] )
+            G = models.tricoord_harmonic(G,H_i,X_S,X_i,indices)
+        elif args.n > 0:
+            R_S = []
+            for (x,y,t) in [ (p,q,t_r), (p,r,t_q), (q,r,t_p) ]:
+                R_S.append( sym.sqrt( X_S[x]**2 + X_S[y]**2 - 2 * X_S[x] * X_S[y] * sym.cos(X_S[t]) ) )
+                if args.T:
+                    R_S.append( sym.sqrt( (X_S[x] * sym.sin( X_S[t] / 2 ) )**2 + ( X_S[x] * sym.cos( X_S[t] / 2 ) + X_S[y] * sym.cos( X_S[t] / 2 ) )**2 + ( X_S[y] * sym.sin( X_S[t] / 2 ) )**2 ) )
+                else:
+                    R_S.append( sym.sqrt( X_S[x]**2 + X_S[y]**2 - 2 * X_S[x] * X_S[y] * sym.cos( math.pi - 0.5 * X_S[t] ) ) )
+            G = models.tricoord_symmetric_planar(G,H_i,X_S,X_i,indices,R_S,args.n)
     for i in range(nnors):
-        tetangs = [ nbonds + nors[i][j] for j in range(6) ] 
+        indices = [ nbonds + nors[i][j] for j in range(6) ] 
         if args.C:
-            # HARMONIC PENTATOMIC
-            for j in range(6):
-                for k in range(j+1,6): 
-                    G += H_i[ tetangs[j], tetangs[k] ] * ( X_S[ tetangs[j] ] - X_i[ tetangs[j] ] ) * ( X_S[ tetangs[k] ] - X_i[ tetangs[k] ] )
-                    p_a = angs[ j ][3] 
-                    q_a = angs[ j ][4] 
-                    p_b = angs[ k ][3] 
-                    q_b = angs[ k ][4] 
-                    opposite_bonds = [ p_b, q_b ]
-                    if not ( p_a in opposite_bonds ) and not ( q_a in opposite_bonds): 
-                        G += H_i[ q_b, tetangs[j] ] * ( X_S[ tetangs[j] ] - X_i[ tetangs[j] ] ) * ( X_S[q_b] - X_i[q_b] )
-                        G += H_i[ q_a, tetangs[k] ] * ( X_S[ tetangs[k] ] - X_i[ tetangs[k] ] ) * ( X_S[q_a] - X_i[q_a] )
-                        G += H_i[ p_b, tetangs[j] ] * ( X_S[ tetangs[j] ] - X_i[ tetangs[j] ] ) * ( X_S[p_b] - X_i[p_b] )
-                        G += H_i[ p_a, tetangs[k] ] * ( X_S[ tetangs[k] ] - X_i[ tetangs[k] ] ) * ( X_S[p_a] - X_i[p_a] )
-    for i in range(nangs): 
+            G = models.pentatomic_harmonic(G,H_i,X_S,X_i,indices,angs)
+        elif args.n > 1:
+            G = models.pentatomic_tetrahedral(G,H_i,X_S,X_i,indices,angs,args.n)
+    if nnors == 0 and noops == 0:
+      for i in range(nangs): 
         p = angs[i][3]
         q = angs[i][4] 
         r = nbonds + i
-        R_V = ( X_S[p] * X_S[p] + X_S[q] * X_S[q] - 2 * X_S[p] * X_S[q] * sym.cos(X_S[r]) )**(0.5)
-        R_E = sym.sqrt( X_i[p] * X_i[p] + X_i[q] * X_i[q] - 2 * X_i[p] * X_i[q] * sym.cos(X_i[r]) )
-        if args.P:
-            R_L = sym.sqrt( X_S[p] * X_S[p] + X_S[q] * X_S[q] - 2 * X_S[p] * X_S[q] * sym.cos( math.pi - 0.5 * X_S[r]) )
-        elif args.T:
-            R_L = sym.sqrt( ( X_S[p] * sym.sin( X_S[r] / 2 ) )**2 + ( X_S[p] * sym.cos( X_S[r] / 2 ) + X_S[q] * sym.cos( X_S[r] / 2 ) )**2 + ( X_S[q] * sym.sin( X_S[r] / 2 ) )**2 )
-        if True:
-            # STRICT SEPARATION OF POTENTIALS:
-            D = 0.5 * TAE
-            x_0 = X_i[p]
-            U_0 = 0.0
-            J = 0.0
-            K = 0.0 
+        indices = p, q, r
         if args.C:
-            # HARMONIC TRIATOMIC
-            sol = []
-            G += H_i[p,q] * ( X_S[p] - X_i[p] ) * ( X_S[q] - X_i[q] ) + 0.5 * H_i[r,r] * ( X_S[r] - X_i[r] )**2 - U_0
-            if abs( X_i[r] - math.pi ) > 1e-4:
-                G += H_i[p,r] * ( X_S[p] - X_i[p] ) * ( X_S[r] - X_i[r] )
-                G += H_i[q,r] * ( X_S[q] - X_i[q] ) * ( X_S[r] - X_i[r] )
+            G = models.bicoord_harmonic(G,H_i,X_S,X_i,indices)
         elif args.n > 0:
-            n_f = 1
-            # MODIFIED ANDERSON TRIATOMIC
-            if abs( X_i[r] - math.pi ) < 1e-4:
-                    # LINEAR
-                    n = args.n
-                    def anderson(parameters,optimization=True):
-                        U_anderson = abs(parameters[0]) * R_V**(-n) 
-                        HOT = ( X_S[p] * X_S[q] )**(-n_f) 
-                        THOL = X_S[p]**(-n_f)
-                        THOR = X_S[q]**(-n_f)
-                        U_anderson += parameters[1] * HOT
-                        U_anderson += parameters[2] * THOL * HOT
-                        U_anderson += parameters[3] * THOR * HOT
-                        U_anderson += parameters[4] * THOL * THOR * HOT
-                        U_anderson += parameters[5] * THOL**2 * HOT
-                        U_anderson += parameters[6] * THOR**2 * HOT
-                        if optimization == True:
-                            dk_xy = eval_eq( sym.diff( sym.diff( U_anderson, X_S[p] ), X_S[q] ), X_S, X_i ) - H_i[p,q]
-                            dk_tt = eval_eq( sym.diff( sym.diff( U_anderson, X_S[r] ), X_S[r] ), X_S, X_i ) - H_i[r,r]
-                            u_0 = eval_eq( U_anderson, X_S, X_i ) - U_0
-                            j_x = eval_eq( sym.diff( U_anderson, X_S[p] ), X_S, X_i ) - J
-                            j_y = eval_eq( sym.diff( U_anderson, X_S[q] ), X_S, X_i ) - J
-                            k_x = eval_eq( sym.diff( U_anderson, X_S[p], 2 ), X_S, X_i ) - K
-                            k_y = eval_eq( sym.diff( U_anderson, X_S[q], 2 ), X_S, X_i ) - K
-                            if verbose > 3:
-                                print(parameters,dk_xy,dk_tt,u_0,j_x,j_y,k_x,k_y)
-                            return [ dk_xy, dk_tt, u_0, j_x, j_y, k_x, k_y ]
-                        elif optimization == "U":
-                            return U_anderson
-                        elif optimization == "dx":
-                            return sym.diff( U_anderson, X_S[p] )
-                        elif optimization == "dxx":
-                            return sym.diff( U_anderson, X_S[p], 2 )
-                    alpha = 16*H_i[r,r]*X_i[p]**4
-                    #beta = alpha - 16 / 5 * H_i[p,q]*X_i[p]**6
-                    #inter = -( alpha + beta ) / ( 2.0 * X_i[p] )**4  
-                    guess = [ alpha, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0 ]
-                    sol = optimize.fsolve( anderson, guess, factor=0.1, xtol=1.0e-8 )
-                    if verbose > 1:
-                       print("FORCE FIELD PARAMETERS:")
-                       print(sol)
-                       print()
-                    G += anderson(sol,"U") 
-            else:
-                    # BENT
-                    if ( args.P + args.T != 1):
-                        print("Choose planar or out-of-plane!")
-                        exit()
-                    if args.n > 9:
-                        n_1 = args.n // 10
-                        n_2 = args.n % 10 
-                        print(n_1,n_2)
+            R_S = []
+            for (x,y,t) in [ (p,q,r) ]:
+                    R_S.append( sym.sqrt( X_S[x]**2 + X_S[y]**2 - 2 * X_S[x] * X_S[y] * sym.cos(X_S[t]) ) )
+                    if args.T:
+                        R_S.append( sym.sqrt( (X_S[x] * sym.sin( X_S[t] / 2 ) )**2 + ( X_S[x] * sym.cos( X_S[t] / 2 ) + X_S[y] * sym.cos( X_S[t] / 2 ) )**2 + ( X_S[y] * sym.sin( X_S[t] / 2 ) )**2 ) )
                     else:
-                        n_1 = args.n
-                        n_2 = args.n
-                    def anderson(parameters,optimization=True):
-                        U_anderson = abs(parameters[0]) * R_V**(-n_1) 
-                        HOT = ( X_S[p] * X_S[q] )**(-n_f) 
-                        THOL = X_S[p]**(-n_f)
-                        THOR = X_S[q]**(-n_f)
-                        U_anderson += parameters[1] * HOT
-                        U_anderson += parameters[2] * THOL * HOT
-                        U_anderson += parameters[3] * THOR * HOT
-                        U_anderson += parameters[4] * THOL * THOR * HOT
-                        U_anderson += parameters[5] * THOL**2 * HOT
-                        U_anderson += parameters[6] * THOR**2 * HOT
-                        U_anderson += ( parameters[7] + parameters[8] * X_S[p] + parameters[9] * X_S[q] ) * R_L**(-n_2)
-                        if optimization == True:
-                            dk_xy = eval_eq( sym.diff( sym.diff( U_anderson, X_S[p] ), X_S[q] ), X_S, X_i ) - H_i[p,q]
-                            dk_tt = eval_eq( sym.diff( sym.diff( U_anderson, X_S[r] ), X_S[r] ), X_S, X_i ) - H_i[r,r]
-                            dk_xt = eval_eq( sym.diff( sym.diff( U_anderson, X_S[p] ), X_S[r] ), X_S, X_i ) - H_i[p,r]
-                            dk_yt = eval_eq( sym.diff( sym.diff( U_anderson, X_S[q] ), X_S[r] ), X_S, X_i ) - H_i[q,r]
-                            u_0 = eval_eq( U_anderson, X_S, X_i ) - U_0
-                            j_x = eval_eq( sym.diff( U_anderson, X_S[p] ), X_S, X_i ) - J
-                            j_y = eval_eq( sym.diff( U_anderson, X_S[q] ), X_S, X_i ) - J
-                            k_x = eval_eq( sym.diff( U_anderson, X_S[p], 2 ), X_S, X_i ) - K
-                            k_y = eval_eq( sym.diff( U_anderson, X_S[q], 2 ), X_S, X_i ) - K
-                            g_t = eval_eq( sym.diff( U_anderson, X_S[r] ), X_S, X_i ) 
-                            return [ dk_xy, dk_tt, u_0, j_x, j_y, k_x, k_y, dk_xt, dk_yt, g_t  ]
-                        elif optimization == "U":
-                            return U_anderson
-                        elif optimization == "dx":
-                            return sym.diff( U_anderson, X_S[p] )
-                        elif optimization == "dxx":
-                            return sym.diff( U_anderson, X_S[p], 2 )
-                    alpha = 16*H_i[r,r]*X_i[p]**4
-                    guess = [ alpha, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.25 * alpha, 0.0, 0.0  ]
-                    sol = optimize.fsolve( anderson, guess, factor=0.1, xtol=1.0e-8 )
-                    if verbose > 1:
-                       print("FORCE FIELD PARAMETERS:")
-                       print(sol)
-                       print()
-                    G += anderson(sol,"U") 
+                        R_S.append( sym.sqrt( X_S[x]**2 + X_S[y]**2 - 2 * X_S[x] * X_S[y] * sym.cos( math.pi - 0.5 * X_S[t] ) ) )
+            if abs( X_i[r] - math.pi ) < 1e-4:
+                G = models.bicoord_linear(G,H_i,X_S,X_i,indices,R_S,args.n)
+            else:
+                G = models.bicoord_bent(G,H_i,X_S,X_i,indices,R_S,args.n)
     for p in range(nbonds):
             if args.O:
                 k_0 = H_i[p,p] 
@@ -285,11 +175,13 @@ if True:
                 # MORSE
                 x_0 = X_i[p]
                 k_0 = H_i[p,p]
+                D = BDE
                 alpha = math.sqrt( 0.5 * k_0 / D ) 
                 G += D * ( 1 - sym.exp( -alpha * ( X_S[p] - x_0 ) ) )**2 
             elif args.V:
                 x_0 = X_i[p]
                 k_0 = H_i[p,p]
+                D = BDE
                 beta = 0.5 * math.sqrt( 0.5 * k_0 / D ) / x_0 - 0.5 / x_0 / x_0
                 G += D * ( 1 - x_0 / X_S[p] * sym.exp( -beta * ( X_S[p] * X_S[p] - x_0 * x_0 ) ) )**2 
     if verbose > 2 and natoms == 3:

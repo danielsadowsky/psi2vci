@@ -319,19 +319,67 @@ def define_internals(X,H,A,bonds,angs,oops):
         AB, ab = bondvec(X,b,a)
         AC, ac = bondvec(X,c,a)
         AD, ad = bondvec(X,d,a)
-        BC, bc = bondvec(X,c,b)
-        BD, bd = bondvec(X,d,b)
-        planarnorm = normal(BC,BD) 
+        theta_BAC = angle(AB,AC)
+        phi = math.asin(  np.dot( np.cross(AB,AC), AD ) / math.sin(theta_BAC)  )
+        if False:
+            print( math.asin(  np.dot( np.cross(AB,AC), AD ) / math.sin(angle(AB,AC))  ) )
+            print( math.asin(  np.dot( np.cross(AC,AD), AB ) / math.sin(angle(AC,AD))  ) )
+            print( math.asin(  np.dot( np.cross(AD,AB), AC ) / math.sin(angle(AD,AB))  ) )
+            print( angle(AB,AC) ) 
+            print( angle(AC,AD) ) 
+            print( angle(AD,AB) ) 
         if sum(A[b]) == 1 and sum(A[c]) == 1 and sum(A[d]) == 1:
-            norm_ab = normal(AB,normal(AB,planarnorm))  
-            norm_ac = normal(AC,normal(AC,planarnorm))  
-            norm_ad = normal(AD,normal(AD,planarnorm))  
-            B = moveatom( B, ns, b, ab * norm_ab  )
-            B = moveatom( B, ns, c, ac * norm_ac  )
-            B = moveatom( B, ns, d, ad * norm_ad  )
-        theta = angle(AB,AC)
-        norm = normal(AB,AC)
-        X_i.append( np.dot(norm,AD) / theta )
+            BC, bc = bondvec(X,c,b)
+            BD, bd = bondvec(X,d,b)
+            planarnorm = normal(BC,BD) 
+            b_B = 0.25 * ab * normal(AB,normal(AB,planarnorm))  
+            b_C = 0.25 * ac * normal(AC,normal(AC,planarnorm))  
+            b_D = 0.25 * ad * normal(AD,normal(AD,planarnorm))  
+            b_A = -b_B - b_C - b_D
+            if False:
+                print(b_D, la.norm(b_D) )
+                print(b_B, la.norm(b_B) )
+                print(b_C, la.norm(b_C) )
+            B = moveatom( B, ns, a, b_A  )
+            B = moveatom( B, ns, b, b_B  )
+            B = moveatom( B, ns, c, b_C  )
+            B = moveatom( B, ns, d, b_D  )
+            if False:
+                print( "N", X[a,0], X[a,1], X[a,2] )
+                print( "H", X[b,0], X[b,1], X[b,2] )
+                print( "F", X[b,0]+b_B[0], X[b,1]+b_B[1], X[b,2]+b_B[2] )
+                print( "H", X[c,0], X[c,1], X[c,2] )
+                print( "F", X[c,0]+b_C[0], X[c,1]+b_C[1], X[c,2]+b_C[2] )
+                print( "H", X[d,0], X[d,1], X[d,2] )
+                print( "F", X[d,0]+b_D[0], X[d,1]+b_D[1], X[d,2]+b_D[2] )
+        elif False:
+            b_D = ( np.cross(AB,AC) / math.cos(phi) / math.sin( angle(AB,AC) ) - AD * math.tan(phi) ) / ad
+            b_B = ( np.cross(AC,AD) / math.cos(phi) / math.sin( angle(AC,AD) ) - AB * math.tan(phi) ) / ab
+            b_C = ( np.cross(AD,AB) / math.cos(phi) / math.sin( angle(AD,AB) ) - AC * math.tan(phi) ) / ac
+            b_A = -b_D - b_C - b_B
+            print(b_D, la.norm(b_D) )
+            print(b_B, la.norm(b_B) )
+            print(b_C, la.norm(b_C) )
+            print(b_A)
+            B = moveatom( B, ns, a, b_A  )
+            B = moveatom( B, ns, b, b_B  )
+            B = moveatom( B, ns, c, b_C  )
+            B = moveatom( B, ns, d, b_D  )
+        elif False:
+            sinsq = math.sin(theta_BAC)**2
+            b_D = ( np.cross(AB,AC) / math.cos(phi) / math.sin(theta_BAC) - AD * math.tan(phi) ) / ad
+            b_B = ( np.cross(AC,AD) / math.cos(phi) / math.sin(theta_BAC) - math.tan(phi) / sinsq * ( AB - math.cos(theta_BAC) * AC ) ) / ab 
+            b_C = ( np.cross(AD,AB) / math.cos(phi) / math.sin(theta_BAC) - math.tan(phi) / sinsq * ( AC - math.cos(theta_BAC) * AB ) ) / ac 
+            b_A = -b_D - b_C - b_B
+            print(b_D, la.norm(b_D) )
+            print(b_B, la.norm(b_B) )
+            print(b_C, la.norm(b_C) )
+            print(b_A)
+            B = moveatom( B, ns, a, b_A  )
+            B = moveatom( B, ns, b, b_B  )
+            B = moveatom( B, ns, c, b_C  )
+            B = moveatom( B, ns, d, b_D  )
+        X_i.append( phi )
     H_i = np.dot(np.dot(B,H),np.transpose(B))
     return X_i, H_i
 
