@@ -94,19 +94,21 @@ def defconn(A):
     conn = []
     angs = []
     oops = []
-    nors = []
     tors = []
+    centers = [ [], [], [], [], [] ]
     for i in range(natoms):
         for j in range(i+1,natoms):
             if A[i,j] == 1:
                 conn.append([i,j])    
         if sum(A[i]) == 2:
+            centers[0].append( len(angs) )
             a = bondto[i][0]
             b = bondto[i][1]
             p = conn.index([min(a,i),max(a,i)])
             q = conn.index([min(b,i),max(b,i)])
             angs.append( ( a, i, b, p, q ) )
         if sum(A[i]) == 3:
+            centers[1].append( len(oops) )
             for j in range(3):
                 for k in range(j+1,3):
                     terms = bondto[i][:]
@@ -126,7 +128,7 @@ def defconn(A):
             oops.append( ( i, a, b, c, p, q, r ) )
         if sum(A[i]) == 4:
             a = len(angs)
-            nors.append( (a,a+1,a+2,a+3,a+4,a+5) )
+            centers[2].append( ( a, a+1, a+2, a+3, a+4, a+5 ) )
             for j in range(4):
                 for k in range(j+1,4):
                     terms = bondto[i][:]
@@ -153,6 +155,8 @@ def defconn(A):
                     t = conn.index([min(e,i),max(e,i)])
                     angs.append( ( a, i, b, p, q ) )
         if sum(A[i]) == 6:
+            a = len(angs)
+            centers[4].append( ( a, a+1, a+2, a+3, a+4, a+5, a+6, a+7, a+8, a+9, a+10, a+11, a+12, a+13, a+14 ) )
             for j in range(6):
                 for k in range(j+1,6):
                     terms = bondto[i][:]
@@ -182,7 +186,7 @@ def defconn(A):
                     #p = conn.index([min(i,k),max(i,k)])
                     #r = conn.index([min(j,l),max(j,l)])
                     tors.append( ( k, i, j, l ) )
-    return natoms, conn, angs, oops, nors, tors
+    return natoms, conn, angs, oops, tors, centers
 
 def distance_matrix(A):
     D = A.copy()

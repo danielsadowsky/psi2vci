@@ -105,7 +105,7 @@ def calc_tensor(G,X_S,X_i,H_i,order=6):
     return F 
 
 def pypes(filename,F,Z,X,X_i,A,notes,order=6):
-    natoms, bonds, angs, oops, nors, tors = read.defconn(A)
+    natoms, bonds, angs, oops, tors, centers = read.defconn(A)
     nbonds = len(bonds)
     nangs = len(angs) 
     noops = len(oops)

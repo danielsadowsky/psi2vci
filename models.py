@@ -212,7 +212,7 @@ def tricoord_symmetric_planar(G,H_i,X_S,X_i,indices,R_S,n):
     G += model(sol,"U")
     return G
 
-def pentatomic_harmonic(G,H_i,X_S,X_i,indices,angs):
+def tetracoord_harmonic(G,H_i,X_S,X_i,indices,angs):
     for j in range(6):
         p_a = angs[ j ][3]
         q_a = angs[ j ][4]
@@ -229,7 +229,7 @@ def pentatomic_harmonic(G,H_i,X_S,X_i,indices,angs):
                 G += H_i[ p_a, indices[k] ] * ( X_S[ indices[k] ] - X_i[ indices[k] ] ) * ( X_S[p_a] - X_i[p_a] )
     return G
 
-def pentatomic_tetrahedral(G,H_i,X_S,X_i,indices,angs,n):
+def tetracoord_tetrahedral(G,H_i,X_S,X_i,indices,angs,n):
     opposites = []
     R_S = []
     for j in range(6):
@@ -319,6 +319,27 @@ def pentatomic_tetrahedral(G,H_i,X_S,X_i,indices,angs,n):
         print(sol)
         print()
     G += model(sol,"U")
+    return G
+
+def hexacoord_harmonic(G,H_i,X_S,X_i,indices,angs):
+    bonds = []
+    for j in range(15):
+        p = angs[ j ][3]
+        q = angs[ j ][4]
+        if not p in bonds:
+            bonds.append(p)
+        if not q in bonds:
+            bonds.append(q)
+    print(bonds)   
+    for j in range(15):
+        p = angs[ j ][3]
+        q = angs[ j ][4]
+        G = bicoord_harmonic(G, H_i, X_S, X_i, ( p, q, indices[j] ) )
+        for k in range(j+1,15):
+            G += H_i[ indices[j], indices[k] ] * ( X_S[ indices[j] ] - X_i[ indices[j] ] ) * ( X_S[ indices[k] ] - X_i[ indices[k] ] )
+        for l in bonds:
+            if l != p and l != q:
+                G += H_i[ l, indices[j] ] * ( X_S[ indices[j] ] - X_i[ indices[j] ] ) * ( X_S[l] - X_i[l] )
     return G
 
 
