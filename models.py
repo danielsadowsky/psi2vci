@@ -330,7 +330,6 @@ def hexacoord_harmonic(G,H_i,X_S,X_i,indices,angs):
             bonds.append(p)
         if not q in bonds:
             bonds.append(q)
-    print(bonds)   
     for j in range(15):
         p = angs[ j ][3]
         q = angs[ j ][4]

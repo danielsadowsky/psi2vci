@@ -28,7 +28,8 @@ parser.add_argument('-n', type=int, default = 0, help='modified n-Anderson poten
 parser.add_argument('-T', action='store_true', help='out-of-plane model for dummy atoms')
 parser.add_argument('-x', type=str, help='geometry file')
 parser.add_argument('-y', type=str, help='Hessian file')
-parser.add_argument('-o', type=str, help='output file')
+parser.add_argument('-c', type=str, default="no_file", help='connectivity file')
+parser.add_argument('-o', type=str, default="output.ff", help='output file')
 parser.add_argument('-v', type=int, default=3, help='level of verbose output')
 args = parser.parse_args()
 verbose = args.v 
@@ -62,7 +63,11 @@ if verbose > 1:
 if True:
     Z, X = read.xyz(args.x) 
     H = read.hess(args.y) 
-    A = read.adj(args.x)
+    if args.c == "no_file":
+        A = read.find_bonds(X,H)
+    else:
+        natoms = len(X)
+        A, D = read.adj(args.c,natoms)
     natoms, bonds, angs, oops, tors, centers = read.defconn(A)
     nbonds = len(bonds)
     nangs = len(angs) 
@@ -72,7 +77,7 @@ if True:
     X_i, H_i = read.define_internals(X,H,A,bonds,angs,oops)
     if args.t > 0.0:
         D  = [ args.t / nbonds ] * nbonds 
-    else:
+    elif args.c == "no_file":
         D = [ 0.0 ] * nbonds
 if verbose > 2:
     print("SETTING UP INTERNAL COORDINATES:")

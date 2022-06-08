@@ -56,9 +56,30 @@ def hess_alt(filename,unitconv=1.0):
     file.close()
     return H
 
-def adj(filename):
+def adj(filename,natoms):
     file = open(filename,'r')
-    natoms = int( file.readline())
+    A = np.zeros((natoms,natoms))
+    D = [] 
+    A = A.astype(int)
+    for line in file:
+        words = line.split()
+        i = int(words[0]) - 1
+        j = int(words[1]) - 1
+        if i < 0 or j < 0:
+            print("Start numbering atoms at 1!")
+            exit()
+        A[i,j] = 1
+        A[j,i] = 1
+        if len(words) == 3:
+            D.append(float(words[2]))
+        else:
+            D.append(0.0)
+    file.close()
+    return A, D 
+
+def adj_from_xyz(filename):
+    file = open(filename,'r')
+    natoms = int(file.readline())
     A = np.zeros((natoms,natoms))
     A = A.astype(int)
     file.readline()
@@ -75,6 +96,32 @@ def adj(filename):
         A[i,j] = 1
         A[j,i] = 1
     file.close()
+    return A 
+
+def find_bonds(X,H):
+    natoms = len(X) 
+    badgers = []
+    for i in range(natoms):
+        for j in range(i+1,natoms):
+            distance = la.norm( X[j] - X[i] ) 
+            vector =  ( X[j] - X[i] ) / distance
+            harmonic = 0.0
+            for k in range(3):
+                for l in range(3):
+                    harmonic += 0.5 * vector[k] * vector[l] * H[3*j+k,3*j+l] 
+                    harmonic += 0.5 * vector[k] * vector[l] * H[3*i+k,3*i+l] 
+            badgers.append( (i, j, harmonic / distance) )
+            #print(i,j,harmonic)
+    badgers.sort(key=lambda a: a[2], reverse=True )
+    A = np.zeros((natoms,natoms))
+    A = A.astype(int)
+    for i, j, badger in badgers:
+        checkfullybonded = 1
+        for k in range(natoms):
+            checkfullybonded *= sum(A[k])  
+        if checkfullybonded == 0:
+            A[i,j] = 1
+            A[j,i] = 1
     return A 
 
 def createbondindex(A):
@@ -281,7 +328,7 @@ def define_internals(X,H,A,bonds,angs,oops):
         elif sum(A[b]) == 1:
             B = moveatom( B, p, b, -AB )
         else:
-            L, R = read.divide(A,a,b)
+            L, R = divide(A,a,b)
             for j in L:
                 B = moveatom( B, p, j, AB / 2 )
             for j in R:
@@ -308,8 +355,8 @@ def define_internals(X,H,A,bonds,angs,oops):
         elif sum(A[c]) == 1 and sum(A[a]) > 1:
             B = moveatom( B, nr, c, scale * cb * PC )
         else:
-            frag_a, rest = read.divide(A,a,b)
-            rest, frag_c = read.divide(A,b,c)
+            frag_a, rest = divide(A,a,b)
+            rest, frag_c = divide(A,b,c)
             for i in frag_a:
                 BI, bi = bondvec(X,b,i)
                 B = moveatom( B, nr, i, scale * bi * PA / 2 )
