@@ -6,3 +6,8 @@ python3 psi2vci.py -V -n 4 -t 0.355240287 -x h2o.xyz -y h2o.hess -c h2o.conn -o 
 A full list of options can be found in the help menu:
 
 python3 psi2vci.py -h
+
+A description of the available bicoordinate potentials can be found here:
+
+https://doi.org/10.1063/5.0096893
+
